@@ -5,8 +5,8 @@
 
 %% API
 -export([start/0, stop/0]). % Start/stop application.
--export([start_event/0]).   % called by supervisor.
--export([stop_event/0, handlers/0]).
+-export([start/1, stop/1]). % Start/stop event server, called by supervisor.
+-export([handlers/0]).      % All registered event handlers. 
 
 %% gen_event
 -export([init/1, handle_event/2, handle_call/2, handle_info/2, terminate/2, code_change/3]).
@@ -24,17 +24,17 @@
 %% API
 %% ------------------------------------------------------------------
 start() ->
-    mto_discovery_sup:start().
+    mto_discovery_sup:start(). % start application
 
 stop() ->
-    mto_discovery_sup:stop().
+    mto_discovery_sup:stop().  % stop application
 
-start_event() ->
+start(event_manager) -> % Internal API called by supervisor
     R = gen_event:start_link({local, ?EVENT_SERVER}),
     gen_event:add_handler(?EVENT_SERVER, ?MODULE, []),
     R.
 
-stop_event() ->
+stop(event_manager) ->
     gen_event:stop(?EVENT_SERVER).
 
 handlers() ->
@@ -44,7 +44,8 @@ handlers() ->
 %% gen_event (call back)
 %% ------------------------------------------------------------------
 init(Args) ->
-    {ok, #state{args = Args}}.
+  process_flag(trap_exit, true),
+  {ok, #state{args = Args}}.
 
 %%-----------------------------------------------------------------
 %% handle_event(Event, State) ->
@@ -274,12 +275,12 @@ start_stop_test() ->
     ?debugVal(stop()), undefined = whereis(?EVENT_SERVER).
 
 start_stop_event_test() ->
-    ?debugVal(start_event()),
+    ?debugVal(start(event_manager)),
     Pid = whereis(?EVENT_SERVER), ?assert(is_pid(Pid)),
-    ?debugVal(stop_event()), undefined = whereis(?EVENT_SERVER).
+    ?debugVal(stop(event_manager)), undefined = whereis(?EVENT_SERVER).
 
 handlers_test() ->
-    ?debugVal(start_event()),
+    ?debugVal(start(event_manager)),
     ?debugVal(handlers()),
     Pid = whereis(?EVENT_SERVER), ?assert(is_pid(Pid)).
 

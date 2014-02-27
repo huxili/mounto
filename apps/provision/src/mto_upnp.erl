@@ -258,8 +258,9 @@ probe_test()->
     ?assertError(badarg, probe("0ST: upnp:rootdevice\r\n")).
 
 dump_test() ->
-    start_link(), ?assert({error,eaccess} == dump('<')),
-    ?assert(ok == dump('test.ets')).
+    start_link(), 
+    ?assert(ok == dump('test.ets')),
+    file:delete('test.ets').
 
 response_test() ->
     start_link(), ?debugVal(responses()).
