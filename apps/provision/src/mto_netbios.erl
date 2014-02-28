@@ -68,7 +68,7 @@ dump(Filename) ->
 responses() ->
     case whereis(?SERVER) of
         undefined -> []; 
-        _ -> gets:tab2list(?RESPONSE_DB)
+        _ -> ets:tab2list(?RESPONSE_DB)
     end.
 
    
