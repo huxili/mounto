@@ -239,7 +239,8 @@ start_test() ->
     case RStart of
       {ok, Pid} -> {ok, Pid} = RStart;  % Patten match
       {error, _} -> {error, {already_started, _}} = RStart
-    end.
+    end, 
+    stop().
 
 ping_test() ->
    start_link(), RPing = ping(), ?debugVal(RPing),
@@ -255,22 +256,24 @@ probe_test()->
     start_link(), Rprobe=probe(), ?debugVal(Rprobe),
     Rprobe1=probe("ST: upnp:rootdevice\r\n"),?debugVal(Rprobe1),
     ?debugVal(probe("ST:urn:Microsoft Windows Peer Name Resolution Protocol: V4:IPV6:LinkLocal\r\n")),
-    ?assertError(badarg, probe("0ST: upnp:rootdevice\r\n")).
+    ?assertError(badarg, probe("0ST: upnp:rootdevice\r\n")), 
+    stop().
 
 dump_test() ->
     start_link(), 
     ?assert(ok == dump('test.ets')),
-    file:delete('test.ets').
+    file:delete('test.ets'), 
+    stop().
 
 response_test() ->
-    start_link(), ?debugVal(responses()).
+    start_link(), ?debugVal(responses()), stop().
 response_hostent_test() ->
-    start_link(), ?debugVal(responses(hostent)).
+    start_link(), ?debugVal(responses(hostent)), stop().
 response_host_test() ->
-    start_link(), ?debugVal(responses(host)).
+    start_link(), ?debugVal(responses(host)), stop().
 response_addr_test() ->
     start_link(), ?debugVal(responses({10,100,5,18})),
-    ?debugVal(responses(addr)).
+    ?debugVal(responses(addr)), stop().
 
 -endif.
 

@@ -248,7 +248,8 @@ start_test() ->
     ?debugVal(stop()),
     RStart = start_link(), ?debugVal(RStart),
     {ok, _Pid} = RStart,  % Patten match
-    {error, {already_started, _}} = start_link().
+    {error, {already_started, _}} = start_link(),
+    stop().
 
 ping_test() ->
    start_link(), RPing = ping(), ?debugVal(RPing),
@@ -263,22 +264,24 @@ stop_test() ->
 
 sub_test()->
     start_link(), Rsub=sub(), ?debugVal(Rsub),
-    Rsub1=sub("_services._dns-sd._tcp.local"),?debugVal(Rsub1).
+    Rsub1=sub("_services._dns-sd._tcp.local"),?debugVal(Rsub1),
+    stop().
 
 dump_test() ->
-    start_link(), ?debugVal(dump()),
-    ?debugVal(dump('<')),
-    ?assert(ok == dump('test.ets')).
+    start_link(), 
+    ?debugVal(dump()),file:delete(?DEFAULT_RESPONSE_FILENAME),
+    ?assert(ok == dump('test.ets')), file:delete('test.ets'),
+    stop(). 
 
 response_test() ->
-    start_link(), ?debugVal(responses()).
+    start_link(), ?debugVal(responses()), stop().
 response_hostent_test() ->
-    start_link(), ?debugVal(responses(hostent)).
+    start_link(), ?debugVal(responses(hostent)), stop().
 response_host_test() ->
-    start_link(), ?debugVal(responses(host)).
+    start_link(), ?debugVal(responses(host)), stop().
 response_addr_test() ->
     start_link(), ?debugVal(responses({10,100,5,18})),
-    ?debugVal(responses(addr)).
+    ?debugVal(responses(addr)), stop().
 
 -endif.
 

@@ -282,6 +282,7 @@ start_stop_event_test() ->
 handlers_test() ->
     ?debugVal(start(event_manager)),
     ?debugVal(handlers()),
-    Pid = whereis(?EVENT_SERVER), ?assert(is_pid(Pid)).
+    Pid = whereis(?EVENT_SERVER), ?assert(is_pid(Pid)), 
+    stop(event_manager).
 
 -endif.

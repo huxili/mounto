@@ -230,7 +230,8 @@ start_test() ->
       {ok, Pid} -> {ok, Pid} = RStart;  % Patten match
       ignore -> ?debugVal({ignore, "server inactive"}); 
       {error, _} -> {error, {already_started, _}} = RStart
-    end.
+    end, 
+    stop().
 
 ping_test() ->
    start_link(), RPing = ping(), ?debugVal(RPing),
@@ -248,17 +249,17 @@ stop_test() ->
 dump_test() ->
     start_link(), 
     ?debugVal(dump('test.ets')),
-    file:delete('test.ets').
+    file:delete('test.ets'), stop().
 
 response_test() ->
-    start_link(), ?debugVal(responses()).
+    start_link(), ?debugVal(responses()), stop().
 response_hostent_test() ->
-    start_link(), ?debugVal(responses(hostent)).
+    start_link(), ?debugVal(responses(hostent)), stop().
 response_host_test() ->
-    start_link(), ?debugVal(responses(host)).
+    start_link(), ?debugVal(responses(host)), stop().
 response_addr_test() ->
     start_link(), ?debugVal(responses({10,100,5,18})),
-    ?debugVal(responses(addr)).
+    ?debugVal(responses(addr)), stop().
 
 -endif.
 
