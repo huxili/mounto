@@ -24,9 +24,7 @@
 -define(SERVER, ?MODULE).
 -define(DB_SUFFIX, _db).
 -define(RESPONSE_DB, mto_netbios_db).
--define(RESPONSE_DB_MODE, protected).
 -define(LOCAL_PORT, 138).
--define(SOCKET_OPTS, [{reuseaddr,true}, {broadcast, true}, {active, true}, binary]).
 -define(DEFAULT_RESPONSE_FILENAME, 'netbios_responses.ets').
 
 % Internal: Server State
@@ -67,11 +65,11 @@ dump(Filename) ->
 %% Raw responses data, opaque.
 responses() ->
     case whereis(?SERVER) of
-        undefined -> []; 
+        undefined -> [];
         _ -> ets:tab2list(?RESPONSE_DB)
     end.
 
-   
+
 
 %%
 % Ex: responses(hostent) =>
@@ -80,7 +78,7 @@ responses() ->
 %%
 responses(hostent) ->
     case whereis(?SERVER) of
-        undefined -> []; 
+        undefined -> [];
         _ -> MS = ets:fun2ms(fun(#response{hostent=H} = R) -> H end),
              L = ets:select(?RESPONSE_DB, MS),
              sets:to_list(sets:from_list(L))
@@ -91,16 +89,16 @@ responses(hostent) ->
 %%
 responses(host) ->
     case whereis(?SERVER) of
-        undefined -> []; 
+        undefined -> [];
         _ -> MS = ets:fun2ms(fun(#response{hostent={_,{_1,H,_3,_4,_5,_6}}} = R) -> H end),
              L = ets:select(?RESPONSE_DB, MS),
              sets:to_list(sets:from_list(L))
-    end; 
+    end;
 
 %% Ex: responses(addr) => [{192,168,5,75},{192,168,5,24}]
 responses(addr) ->
     case whereis(?SERVER) of
-        undefined -> []; 
+        undefined -> [];
         _ -> MS = ets:fun2ms(fun(#response{addr=A} = R) -> A end),
              L = ets:select(?RESPONSE_DB, MS),
              sets:to_list(sets:from_list(L))
@@ -110,7 +108,7 @@ responses(addr) ->
 %% reponses({10,100,5,75}) =>
 responses(Addr) ->
     case whereis(?SERVER) of
-        undefined -> []; 
+        undefined -> [];
         _ -> MS = ets:fun2ms(fun(#response{addr=A} = R) when A == Addr -> R end),
              ets:select(?RESPONSE_DB, MS)
     end.
@@ -125,7 +123,8 @@ init([]) ->
   {Osfamily, _Osname} = os:type(),
   case Osfamily of
       win32 ->
-           {ok, S} = gen_udp:open(?LOCAL_PORT, ?SOCKET_OPTS),
+           Opts = [{reuseaddr,true}, {broadcast, true}, {active, true}, binary],
+           {ok, S} = gen_udp:open(?LOCAL_PORT, Opts),
            Db = init_db(),
            mto_trace:trace(?SERVER, init, "ok"),
            {ok, #state{socket = S, ping=0, db=Db}};
@@ -196,20 +195,20 @@ dump_reponse_impl(Filename) ->
 %% Callback Internal
 %% -------------------------------------
 init_db() ->
-   Tab = ets:new(?RESPONSE_DB, [set, {keypos,#response.addr}, named_table, ?RESPONSE_DB_MODE]),
+   Tab = ets:new(?RESPONSE_DB, [set, {keypos,#response.addr}, named_table]),
    mto_trace:trace(?SERVER, init_db, ok),
    Tab.
 
 handle_info_response({udp, FromIp, FromPort, Msg}, State) ->
-   % mto_trace:trace(?SERVER, response, FromIp),
    Host = inet:gethostbyaddr(FromIp),
    Msg1 = inet_dns:decode(Msg),
+   mto_discovery:register_pnode({netbios, FromIp, FromPort, Msg1}),
    ets:insert(?RESPONSE_DB, #response{addr=FromIp, hostent=Host, port=FromPort, response=Msg1}),
    State.
 
 dump_response_db(Filename)->
    R = ets:tab2file(?RESPONSE_DB, Filename),
-   mto_trace:trace(?SERVER, dump_response, R), 
+   mto_trace:trace(?SERVER, dump_response, R),
    R.
 
 
@@ -228,9 +227,9 @@ start_test() ->
     ?debugVal(ets:info(?RESPONSE_DB)),
     case RStart of
       {ok, Pid} -> {ok, Pid} = RStart;  % Patten match
-      ignore -> ?debugVal({ignore, "server inactive"}); 
+      ignore -> ?debugVal({ignore, "server inactive"});
       {error, _} -> {error, {already_started, _}} = RStart
-    end, 
+    end,
     stop().
 
 ping_test() ->
@@ -238,7 +237,7 @@ ping_test() ->
    case whereis(?SERVER) of
       undefined -> {error, server_inactive};
       _ -> ?assert({ok,pong} == RPing)
-   end, 
+   end,
    stop(), RPing1 = ping(), ?debugVal(RPing1),
    ?assert({error,pang} == RPing1).
 
@@ -247,7 +246,7 @@ stop_test() ->
     RStopPing = ping(), ?assert({error,pang} == RStopPing).
 
 dump_test() ->
-    start_link(), 
+    start_link(),
     ?debugVal(dump('test.ets')),
     file:delete('test.ets'), stop().
 

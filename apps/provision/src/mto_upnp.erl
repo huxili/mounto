@@ -26,12 +26,10 @@
 
 -define(SERVER, ?MODULE).
 -define(RESPONSE_DB, mto_upnp_db).
--define(RESPONSE_DB_MODE, protected).
 -define(LOCAL_PORT, 1900).
 -define(UPNP_PORT, 1900).
 -define(UPNP_ADDR, {239,255,255,250}).
 -define(UPNP_ADDRv6, {16#FF02,0,0,0,0,0,0,16#F}).
--define(SOCKET_OPTS, [{reuseaddr,true}, {broadcast, true}, {active, true}]).
 -define(UPNP_SEARCH_ALL, "M-SEARCH * HTTP/1.1\r\n" "Host: 239.255.255.250:1900\r\n" "Man: \"ssdp:discover\"\r\n" "ST: ssdp:all\r\n" "MX: 3\r\n\r\n").
 -define(upnp_search(ST), "M-SEARCH * HTTP/1.1\r\n" "Host: 239.255.255.250:1900\r\n" "Man: \"ssdp:discover\"\r\n" ++ ST ++ "MX: 3\r\n\r\n").
 -define(DEFAULT_RESPONSE_FILENAME, 'upnp_responses.ets').
@@ -119,7 +117,8 @@ responses(Addr) ->
 
 init([]) ->
   process_flag(trap_exit, true),
-  {ok, S} = gen_udp:open(?LOCAL_PORT, ?SOCKET_OPTS),
+  Opts = [{reuseaddr,true}, {broadcast, true}, {active, true}],
+  {ok, S} = gen_udp:open(?LOCAL_PORT, Opts),
   Db = init_db(),
   mto_trace:trace(?SERVER, init, "ok"),
   {ok, #state{socket = S, ping=0, db=Db}, 5000}.
@@ -199,7 +198,7 @@ dump_reponse_impl(Filename) ->
 %% Callback Internal
 %% -------------------------------------
 init_db() ->
-   ets:new(?RESPONSE_DB, [bag, {keypos,#response.addr}, named_table, ?RESPONSE_DB_MODE]).
+   ets:new(?RESPONSE_DB, [set, {keypos,#response.addr}, named_table]).
 
 handle_cast_search(SearchMsg,State) ->
    mto_trace:trace(?SERVER, search, "cast ~p", [SearchMsg]),
@@ -207,6 +206,7 @@ handle_cast_search(SearchMsg,State) ->
    State.
 
 handle_info_response({udp, FromIp, FromPort, Msg}, State) ->
+   mto_discovery:register_pnode({upnp, FromIp, FromPort, Msg}),
    Host = inet:gethostbyaddr(FromIp),
    ets:insert(?RESPONSE_DB, #response{addr=FromIp, hostent=Host, port=FromPort, response=Msg}),
    State.
@@ -239,7 +239,7 @@ start_test() ->
     case RStart of
       {ok, Pid} -> {ok, Pid} = RStart;  % Patten match
       {error, _} -> {error, {already_started, _}} = RStart
-    end, 
+    end,
     stop().
 
 ping_test() ->
@@ -256,13 +256,13 @@ probe_test()->
     start_link(), Rprobe=probe(), ?debugVal(Rprobe),
     Rprobe1=probe("ST: upnp:rootdevice\r\n"),?debugVal(Rprobe1),
     ?debugVal(probe("ST:urn:Microsoft Windows Peer Name Resolution Protocol: V4:IPV6:LinkLocal\r\n")),
-    ?assertError(badarg, probe("0ST: upnp:rootdevice\r\n")), 
+    ?assertError(badarg, probe("0ST: upnp:rootdevice\r\n")),
     stop().
 
 dump_test() ->
-    start_link(), 
+    start_link(),
     ?assert(ok == dump('test.ets')),
-    file:delete('test.ets'), 
+    file:delete('test.ets'),
     stop().
 
 response_test() ->

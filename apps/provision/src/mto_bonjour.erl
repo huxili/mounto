@@ -24,16 +24,12 @@
 
 
 -define(SERVER, ?MODULE).
--define(DB_SUFFIX, _db).
 -define(RESPONSE_DB, mto_bonjour_db).
--define(RESPONSE_DB_MODE, protected).
 -define(LOCAL_PORT, 5353).
 -define(MDNS_PORT, 5353).
 -define(MDNS_ADDR, {224,0,0,251}).
 -define(MDNS_ADDRv6, {16#FF02,0,0,0,0,0,0,16#FB}).
--define(SOCKET_OPTS, [{reuseaddr,true}, {broadcast, true}, {active, true}, binary]).
 -define(DOMAIN_LOCAL, "_services._dns-sd._udp.local").
--define(mdns_search(Domain), (Domain)).
 -define(DEFAULT_RESPONSE_FILENAME, 'mdns_responses.ets').
 
 % Internal: Server State
@@ -122,8 +118,11 @@ responses(Addr) ->
 
 init([]) ->
   process_flag(trap_exit, true),
-  {ok, S} = gen_udp:open(?LOCAL_PORT, ?SOCKET_OPTS),
-  inet:setopts(S, [{add_membership, {{224,0,0,251}, {0,0,0,0}}}]),
+  Opts = [{reuseaddr,true}, {broadcast, true}, {active, true},
+          {add_membership, {{224,0,0,251}, {0,0,0,0}}},
+          binary
+          ],
+  {ok, S} = gen_udp:open(?LOCAL_PORT, Opts),
   Db = init_db(),
   mto_trace:trace(?SERVER, init, "ok"),
   {ok, #state{socket = S, ping=0, db=Db}, 5000}.
@@ -197,7 +196,7 @@ dump_reponse_impl(Filename) ->
 %% Callback Internal
 %% -------------------------------------
 init_db() ->
-   Tab = ets:new(?RESPONSE_DB, [bag, {keypos,#response.addr}, named_table, ?RESPONSE_DB_MODE]),
+   Tab = ets:new(?RESPONSE_DB, [set, {keypos,#response.addr}, named_table]),
    mto_trace:trace(?SERVER, init_db, ok),
    Tab.
 
@@ -210,6 +209,7 @@ handle_info_response({udp, FromIp, FromPort, Msg}, State) ->
    mto_trace:trace(?SERVER, response, FromIp),
    Host = inet:gethostbyaddr(FromIp),
    Msg1 = inet_dns:decode(Msg),
+   mto_discovery:register_pnode({bonjour, FromIp, FromPort, Msg1}),
    ets:insert(?RESPONSE_DB, #response{addr=FromIp, hostent=Host, port=FromPort, response=Msg1}),
    State.
 
@@ -268,10 +268,10 @@ sub_test()->
     stop().
 
 dump_test() ->
-    start_link(), 
+    start_link(),
     ?debugVal(dump()),file:delete(?DEFAULT_RESPONSE_FILENAME),
     ?assert(ok == dump('test.ets')), file:delete('test.ets'),
-    stop(). 
+    stop().
 
 response_test() ->
     start_link(), ?debugVal(responses()), stop().
