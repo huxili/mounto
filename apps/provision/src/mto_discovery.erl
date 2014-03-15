@@ -1,14 +1,15 @@
 
 -module(mto_discovery).
--vsn("1.0.0").
+-vsn("1.1.0").
 -behaviour(gen_event).
 -include_lib("stdlib/include/ms_transform.hrl").
 
 %% API
--export([start/0, stop/0]). % Start/stop application.
+-export([start/0, stop/0, restart/0]). % Start/stop application.
 -export([start/1, stop/1]). % Start/stop event server, called by supervisor.
--export([handlers/0]).      % All registered event handlers.
--export([register_pnode/1, pnode/1]).
+-export([handlers/0, register_pnode/1]). % Event API.
+-export([pnode/0,pnode/1]).  % Physical node API
+-export([enode/0]).   %Erlang node API
 
 %% gen_event
 -export([init/1, handle_event/2, handle_call/2, handle_info/2, terminate/2, code_change/3]).
@@ -33,6 +34,9 @@ start() ->
 
 stop() ->
     mto_discovery_sup:stop().  % stop application
+
+restart() ->
+    stop(), start().
 
 start(event_manager) -> % Internal API called by supervisor
     R = gen_event:start_link({local, ?EVENT_SERVER}),
@@ -61,11 +65,32 @@ register_pnode({netbios, FromIP, FromPort, RawMsg}) ->
        _ -> gen_event:notify(?EVENT_SERVER, {netbios, FromIP, FromPort, RawMsg})
    end.
 
-pnode(addr) ->
+pnode() ->
     case whereis(?EVENT_SERVER) of
+       undefined -> {error, {?EVENT_SERVER, down}};
+       _ -> ets:tab2list(?DISCOVERED_PNODE_DB)
+   end.
+
+pnode(host) ->
+    case whereis(?EVENT_SERVER) of
+       undefined -> {error, {?EVENT_SERVER, down}};
+       _ -> MS = ets:fun2ms(fun(#pnode{host=H} = R) -> H end),
+            ets:select(?DISCOVERED_PNODE_DB, MS)
+   end;
+pnode(addr) ->
+   case whereis(?EVENT_SERVER) of
        undefined -> {error, {?EVENT_SERVER, down}};
        _ -> MS = ets:fun2ms(fun(#pnode{addr=A} = R) -> A end),
             ets:select(?DISCOVERED_PNODE_DB, MS)
+   end.
+
+enode() ->
+   case pnode(addr) of
+      {error, Reason} -> {error, Reason};
+      [] -> [];
+      PNode -> ENode = [{A, erl_epmd:names(A)} || A<-PNode],
+              F = fun(E) -> case E of {_, {ok, _}} -> true; _ -> false end end,
+              lists:filter(F, ENode)
    end.
 
 %% ------------------------------------------------------------------
@@ -169,6 +194,9 @@ handlers_test() ->
 register_pnode_upnp_test() ->
     ?debugVal(start(event_manager)),
     ?debugVal(register_pnode({upnp, {127,0,0,1}, 1900, no_msg})),
+    ?debugVal(register_pnode({upnp, {127,0,0,1}, 1900, no_msg})),
+    ?debugVal(register_pnode({bonjour, {127,0,0,1}, 1900, no_msg})),
+    ?debugVal(register_pnode({bonjour, {99999,0,0,1}, 1900, no_msg})),
     stop(event_manager),
     {error,_} = register_pnode({upnp, {127,0,0,1}, 1900, no_msg}).
 
@@ -176,19 +204,33 @@ register_pnode_bonjour_test() ->
     ?debugVal(start(event_manager)),
     ?debugVal(register_pnode({bonjour, {127,0,0,1}, 1900, no_msg})),
     stop(event_manager),
-    {error,_} = register_pnode({upnp, {127,0,0,1}, 1900, no_msg}).
+    {error,_} = register_pnode({bonjour, {127,0,0,1}, 1900, no_msg}).
 
 register_pnode_netbios_test() ->
     ?debugVal(start(event_manager)),
     ?debugVal(register_pnode({netbios, {127,0,0,1}, 1900, no_msg})),
     stop(event_manager),
-    {error,_} = register_pnode({upnp, {127,0,0,1}, 1900, no_msg}).
+    {error,_} = register_pnode({netbios, {127,0,0,1}, 1900, no_msg}).
 
 pnode_test() ->
     ?debugVal(start(event_manager)),
     ?debugVal(register_pnode({netbios, {127,0,0,1}, 1900, no_msg})),
+    ?debugVal(pnode()),
     ?debugVal(pnode(addr)),
     stop(event_manager),
+    ?debugVal(pnode()),
     ?debugVal(pnode(addr)).
+
+enode_test() ->
+    ?debugVal(start(event_manager)),
+    ?debugVal(enode()),
+    stop(event_manager),
+    ?debugVal(enode()).
+
+
+unknown_msg_test() ->
+    ?debugVal(start(event_manager)),
+    ?EVENT_SERVER ! impossible_msg,
+    stop(event_manager).
 
 -endif.

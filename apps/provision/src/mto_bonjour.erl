@@ -8,14 +8,14 @@
 %%
 
 -module(mto_bonjour).
--vsn("1.1.0").
+-vsn("1.2.0").
 -behaviour(gen_server).
 -include_lib("stdlib/include/ms_transform.hrl").
 -include_lib("kernel/src/inet_dns.hrl").
 
 % API
--export([start/0, start_link/0, stop/0, ping/0]).
--export([sub/0, sub/1]).
+-export([start/0, start_link/0, stop/0, ping/0, restart/0]).
+-export([sub/0, sub/1, advertise/0]).
 -export([dump/0, dump/1]).
 -export([responses/0, responses/1]).
 
@@ -29,12 +29,14 @@
 -define(MDNS_PORT, 5353).
 -define(MDNS_ADDR, {224,0,0,251}).
 -define(MDNS_ADDRv6, {16#FF02,0,0,0,0,0,0,16#FB}).
--define(DOMAIN_LOCAL, "_services._dns-sd._udp.local").
+-define(SSD_DOMAIN_PREFIX, "_services._dns-sd._udp.").
+-define(DOMAIN_LOCAL, "local").
 -define(DEFAULT_RESPONSE_FILENAME, 'mdns_responses.ets').
 
 % Internal: Server State
 -record(state, {
               socket,
+              ttl = 300, % in second
               subscriptions=[],
               services=[],
               answers=[],
@@ -56,6 +58,10 @@ start() ->
 start_link() ->
     gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
 
+restart() ->
+    stop(), start().
+
+
 stop()->
     case whereis(?SERVER) of
         undefined -> {ok, stop};
@@ -67,6 +73,12 @@ ping() ->
         undefined -> {error, pang};
         _ -> gen_server:call(?SERVER, #mto{cmd=ping})
     end.
+
+
+advertise() ->
+    advertise_impl(?DOMAIN_LOCAL).
+advertise(Domain) ->
+    advertise_impl(Domain).
 
 sub() ->
     sub_impl(?DOMAIN_LOCAL).
@@ -115,21 +127,26 @@ responses(Addr) ->
 %% ------------------------------------------------------------------
 %% gen_server (call back)
 %% ------------------------------------------------------------------
-
 init([]) ->
   process_flag(trap_exit, true),
   Opts = [{reuseaddr,true}, {broadcast, true}, {active, true},
+          { multicast_loop, true}, { multicast_ttl, 255},
           {add_membership, {{224,0,0,251}, {0,0,0,0}}},
           binary
           ],
-  {ok, S} = gen_udp:open(?LOCAL_PORT, Opts),
+  S = case gen_udp:open(?LOCAL_PORT, Opts) of
+         {ok, Socket} -> Socket;
+         _ -> {ok, Socket} = gen_udp:open(0, Opts), Socket
+      end,
   Db = init_db(),
+  erlang:send_after(500, self(), #mto{cmd=search, args=[?DOMAIN_LOCAL]}),
+  erlang:send_after(1000, self(), #mto{cmd=advertise, args=[?DOMAIN_LOCAL]}),
   mto_trace:trace(?SERVER, init, "ok"),
-  {ok, #state{socket = S, ping=0, db=Db}, 5000}.
+  {ok, #state{socket = S, ping=0, db=Db}}.
 
 %% Cmd: Stop
 handle_call(#mto{cmd=stop}, _From, State) ->
-     mto_trace:trace(?SERVER, stop, "ok"),
+    mto_trace:trace(?SERVER, stop, "ok"),
     {stop, normal, {ok,stop}, State};
 
 %% Cmd: Ping
@@ -140,32 +157,46 @@ handle_call(#mto{cmd=ping}, From, State) ->
     {reply, {ok, pong}, NewState};
 
 handle_call(Request, _From, State) ->
-    error_logger:info_msg("any_cmd ~p \r\n", [Request]),
     {reply, ok, State}.
 
 %% Cmd: Search
 handle_cast(#mto{cmd=search, args=[Domain]}, State) ->
+    mto_trace:trace(?SERVER, search, Domain),
     handle_cast_search(Domain,State),
+    erlang:send_after(crypto:rand_uniform(60000, 600000), self(),
+                      #mto{cmd=search, args=[Domain]}),
+    {noreply, State};
+
+%% Cmd: Advertise
+handle_cast(#mto{cmd=advertise, args=[Domain]}, State) ->
+    mto_trace:trace(?SERVER, advertise, Domain),
+    handle_cast_advertise(Domain,State),
+    erlang:send_after(crypto:rand_uniform(60000, 600000), self(), 
+                     #mto{cmd=advertise, args=[Domain]}),
     {noreply, State};
 
 %% Cmd: Dump_response
 handle_cast(#mto{cmd=dump_response, args=[Filename]}, State) ->
+    mto_trace:trace(?SERVER, dump_response, Filename),
     dump_response_db(Filename),
     {noreply, State};
 
 handle_cast(_Msg, State) ->
-    mto_trace:trace(?SERVER, cast, _Msg),
     {noreply, State}.
+
+handle_info(#mto{cmd=search, args=[_Domain]}=Cmd, State) ->
+    handle_cast(Cmd, State),
+    {noreply, State};
+
+handle_info(#mto{cmd=advertise, args=[_Domain]}=Cmd, State) ->
+    handle_cast(Cmd, State),
+    {noreply, State};
 
 handle_info({udp, _S, FromIp, FromPort, Msg}, State) ->
     handle_info_response({udp, FromIp, FromPort, Msg}, State),
     {noreply, State};
-handle_info(timeout, State) ->
-    % Start search automatically after start (timeout)
-    handle_cast_search(?DOMAIN_LOCAL,State),
-    {noreply, State};
+
 handle_info(_Info, State) ->
-    mto_trace:trace(?SERVER, info, _Info),
     {noreply, State}.
 
 terminate(Reason, State) ->
@@ -178,8 +209,14 @@ code_change(_OldVsn, State, _Extra) ->
 
 
 %% ------------------------------------------------------------------
-%% API Internal
+%% API Impl (L1)
 %% ------------------------------------------------------------------
+advertise_impl(Domain) ->
+   case whereis(?SERVER) of
+      undefined -> {error, server_inactive};
+      _ -> gen_server:cast(?SERVER, #mto{cmd=advertise, args=[Domain]})
+   end.
+
 sub_impl(Domain) ->
    case whereis(?SERVER) of
       undefined -> {error, server_inactive};
@@ -193,40 +230,70 @@ dump_reponse_impl(Filename) ->
    end.
 
 %% --------------------------------------
-%% Callback Internal
+%% Callback Impl (L1)
 %% -------------------------------------
 init_db() ->
    Tab = ets:new(?RESPONSE_DB, [set, {keypos,#response.addr}, named_table]),
-   mto_trace:trace(?SERVER, init_db, ok),
    Tab.
 
 handle_cast_search(Domain,State) ->
-   mto_trace:trace(?SERVER, search, "cast ~p", [Domain]),
-   search_impl(Domain, State),
+   Message = message(search, Domain, State),
+   gen_udp:send(State#state.socket, ?MDNS_ADDR, ?MDNS_PORT, inet_dns:encode(Message)),
+   gen_udp:send(State#state.socket, ?MDNS_ADDRv6, ?MDNS_PORT, inet_dns:encode(Message)),
+   State.
+
+handle_cast_advertise(Domain,State) ->
+   Message = message(advertise, Domain, State),
+   gen_udp:send(State#state.socket, ?MDNS_ADDR, ?MDNS_PORT, inet_dns:encode(Message)),
+   gen_udp:send(State#state.socket, ?MDNS_ADDRv6, ?MDNS_PORT, inet_dns:encode(Message)),
    State.
 
 handle_info_response({udp, FromIp, FromPort, Msg}, State) ->
-   mto_trace:trace(?SERVER, response, FromIp),
    Host = inet:gethostbyaddr(FromIp),
    Msg1 = inet_dns:decode(Msg),
    mto_discovery:register_pnode({bonjour, FromIp, FromPort, Msg1}),
    ets:insert(?RESPONSE_DB, #response{addr=FromIp, hostent=Host, port=FromPort, response=Msg1}),
    State.
 
-search_impl(Domain, State) ->
-   Queries = [#dns_query{type=ptr, domain=Domain, class=in},
-              #dns_query{type=srv, domain=Domain, class=in}],
-   Out = #dns_rec{header=#dns_header{}, qdlist=Queries},
-   gen_udp:send(State#state.socket, ?MDNS_ADDR, ?MDNS_PORT, inet_dns:encode(Out)),
-   gen_udp:send(State#state.socket, ?MDNS_ADDRv6, ?MDNS_PORT, inet_dns:encode(Out)),
-   State.
-
 dump_response_db(Filename)->
    R = ets:tab2file(?RESPONSE_DB, Filename),
-   mto_trace:trace(?SERVER, dump_response, R),
    R.
 
+%% --------------------------------
+%% Callback Impl (L2)
+%% --------------------------------
+message(search, Domain, State) ->
+   SSD = ?SSD_DOMAIN_PREFIX ++ Domain,
+   Queries = [#dns_query{type=ptr, domain=SSD, class=in},
+              #dns_query{type=srv, domain=SSD, class=in}],
+   Msg = #dns_rec{header=#dns_header{}, qdlist=Queries}, Msg;
 
+message(advertise, Domain, State) ->
+   inet_dns:make_msg([{header, header(advertise)},
+                      {anlist, answers(advertise,Domain, State)},
+                      {arlist, resources(advertise,Domain, State)}]).
+
+header(advertise) ->
+   inet_dns:make_header([{id,0},
+                         {qr,true},
+                         {opcode,query},
+                         {aa,true},
+                         {tc,false},
+                         {rd,false},
+                         {ra,false},
+                         {pr,false},
+                         {rcode,0}]).
+
+answers(advertise, Domain, #state{ttl = TTL} = State) ->
+   SSD = ?SSD_DOMAIN_PREFIX ++ Domain,
+   Mto = "_node._mto._udp.local",
+   Node = atom_to_list(node()),
+   [inet_dns:make_rr([{type, ptr}, {domain, SSD}, {class, in}, {ttl, TTL}, {data, Node}]),
+    inet_dns:make_rr([{type, ptr}, {domain, Mto}, {class, in}, {ttl, TTL}, {data, Node}])
+   ].
+
+resources(advertise,Domain, State) ->
+   [].
 
 %%-----------------------------------------------------------------------
 %% Eunit testing code.
@@ -241,14 +308,20 @@ dump_response_db(Filename)->
 
 exception_test() ->
     ?assert({error, server_inactive}==sub()),
+    ?assert({error, server_inactive}==advertise()),
     ?assert({error, server_inactive}==dump()).
 
 start_test() ->
     ?debugVal(start()),
-    ?debugVal(stop()),
+    {timeout, 15, ?debugVal(stop())},
     RStart = start_link(), ?debugVal(RStart),
     {ok, _Pid} = RStart,  % Patten match
     {error, {already_started, _}} = start_link(),
+    stop().
+
+restart_test() ->
+    ?debugVal(start()),
+    ?debugVal(restart()),
     stop().
 
 ping_test() ->
@@ -265,6 +338,11 @@ stop_test() ->
 sub_test()->
     start_link(), Rsub=sub(), ?debugVal(Rsub),
     Rsub1=sub("_services._dns-sd._tcp.local"),?debugVal(Rsub1),
+    stop().
+
+advertise_test()->
+    start_link(), R=advertise(), ?debugVal(R),
+    R1=advertise("_services._dns-sd._tcp.local"),?debugVal(R1),
     stop().
 
 dump_test() ->

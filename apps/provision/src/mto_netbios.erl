@@ -13,7 +13,7 @@
 -include_lib("stdlib/include/ms_transform.hrl").
 
 % API
--export([start/0, start_link/0, stop/0, ping/0]).
+-export([start/0, restart/0, start_link/0, stop/0, ping/0]).
 -export([dump/0, dump/1]).
 -export([responses/0, responses/1]).
 
@@ -41,6 +41,9 @@
 %% ------------------------------------------------------------------
 start() ->
     gen_server:start({local, ?SERVER}, ?MODULE, [], []).
+
+restart() ->
+    stop(), start().
 
 start_link() ->
     gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
