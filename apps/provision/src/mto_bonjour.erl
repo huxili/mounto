@@ -8,7 +8,7 @@
 %%
 
 -module(mto_bonjour).
--vsn("1.2.0").
+-vsn("1.2.1").
 -behaviour(gen_server).
 -include_lib("stdlib/include/ms_transform.hrl").
 -include_lib("kernel/src/inet_dns.hrl").
@@ -90,10 +90,8 @@ dump() ->
 dump(Filename) ->
     dump_reponse_impl(Filename).
 
-%% Raw responses data, opaque.
 responses() ->
     ets:tab2list(?RESPONSE_DB).
-
 %%
 % Ex: responses(hostent) =>
 %      [{ok,{hostent,"PCLI",[],inet,4,[{192,168,5,10}]}},
@@ -103,7 +101,6 @@ responses(hostent) ->
     MS = ets:fun2ms(fun(#response{hostent=H} = R) -> H end),
     L = ets:select(?RESPONSE_DB, MS),
     sets:to_list(sets:from_list(L));
-
 %%
 % Ex:  responses(host) => ["PCLI","MACLI"]
 %%
@@ -111,13 +108,11 @@ responses(host) ->
     MS = ets:fun2ms(fun(#response{hostent={_,{_1,H,_3,_4,_5,_6}}} = R) -> H end),
     L = ets:select(?RESPONSE_DB, MS),
     sets:to_list(sets:from_list(L));
-
 %% Ex: responses(addr) => [{192,168,5,75},{192,168,5,24}]
 responses(addr) ->
     MS = ets:fun2ms(fun(#response{addr=A} = R) -> A end),
     L = ets:select(?RESPONSE_DB, MS),
     sets:to_list(sets:from_list(L));
-
 %% reponses({10,100,5,75}) =>
 responses(Addr) ->
     MS = ets:fun2ms(fun(#response{addr=A} = R) when A == Addr -> R end),
@@ -156,7 +151,7 @@ handle_call(#mto{cmd=ping}, From, State) ->
     NewState = State#state{ping=NPing},
     {reply, {ok, pong}, NewState};
 
-handle_call(Request, _From, State) ->
+handle_call(_Request, _From, State) ->
     {reply, ok, State}.
 
 %% Cmd: Search
@@ -178,7 +173,7 @@ handle_cast(#mto{cmd=advertise, args=[Domain]}, State) ->
 %% Cmd: Dump_response
 handle_cast(#mto{cmd=dump_response, args=[Filename]}, State) ->
     mto_trace:trace(?SERVER, dump_response, Filename),
-    dump_response_db(Filename),
+    ets:tab2file(?RESPONSE_DB, Filename),
     {noreply, State};
 
 handle_cast(_Msg, State) ->
@@ -200,8 +195,8 @@ handle_info(_Info, State) ->
     {noreply, State}.
 
 terminate(Reason, State) ->
-    inet:close(State#state.socket),
     mto_trace:trace(?SERVER, terminate, Reason),
+    inet:close(State#state.socket),
     ok.
 
 code_change(_OldVsn, State, _Extra) ->
@@ -233,7 +228,7 @@ dump_reponse_impl(Filename) ->
 %% Callback Impl (L1)
 %% -------------------------------------
 init_db() ->
-   Tab = ets:new(?RESPONSE_DB, [set, {keypos,#response.addr}, named_table]),
+   Tab = ets:new(?RESPONSE_DB, [bag, {keypos,#response.addr}, named_table]),
    Tab.
 
 handle_cast_search(Domain,State) ->
@@ -255,14 +250,11 @@ handle_info_response({udp, FromIp, FromPort, Msg}, State) ->
    ets:insert(?RESPONSE_DB, #response{addr=FromIp, hostent=Host, port=FromPort, response=Msg1}),
    State.
 
-dump_response_db(Filename)->
-   R = ets:tab2file(?RESPONSE_DB, Filename),
-   R.
 
 %% --------------------------------
 %% Callback Impl (L2)
 %% --------------------------------
-message(search, Domain, State) ->
+message(search, Domain, _State) ->
    SSD = ?SSD_DOMAIN_PREFIX ++ Domain,
    Queries = [#dns_query{type=ptr, domain=SSD, class=in},
               #dns_query{type=srv, domain=SSD, class=in}],
@@ -286,10 +278,10 @@ header(advertise) ->
 
 answers(advertise, Domain, #state{ttl = TTL} = State) ->
    SSD = ?SSD_DOMAIN_PREFIX ++ Domain,
-   Mto = "_node._mto._udp.local",
-   Node = atom_to_list(node()),
-   [inet_dns:make_rr([{type, ptr}, {domain, SSD}, {class, in}, {ttl, TTL}, {data, Node}]),
-    inet_dns:make_rr([{type, ptr}, {domain, Mto}, {class, in}, {ttl, TTL}, {data, Node}])
+   MTO = "_mto._tcp.local",
+   Node = atom_to_list(node()) ++ "." ++ MTO,
+   [inet_dns:make_rr([{type, ptr}, {domain, SSD}, {class, in}, {ttl, TTL}, {data, MTO}]),
+    inet_dns:make_rr([{type, ptr}, {domain, MTO}, {class, in}, {ttl, TTL}, {data, Node}])
    ].
 
 resources(advertise,Domain, State) ->
