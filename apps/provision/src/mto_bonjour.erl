@@ -37,6 +37,7 @@
 -record(state, {
               socket,
               ttl = 300, % in second
+              mto_port=8888,
               subscriptions=[],
               services=[],
               answers=[],
@@ -276,16 +277,31 @@ header(advertise) ->
                          {pr,false},
                          {rcode,0}]).
 
-answers(advertise, Domain, #state{ttl = TTL} = State) ->
+answers(advertise, Domain, #state{ttl = TTL, mto_port=Port} = State) ->
    SSD = ?SSD_DOMAIN_PREFIX ++ Domain,
-   MTO = "_mto._tcp.local",
-   Node = atom_to_list(node()) ++ "." ++ MTO,
-   [inet_dns:make_rr([{type, ptr}, {domain, SSD}, {class, in}, {ttl, TTL}, {data, MTO}]),
-    inet_dns:make_rr([{type, ptr}, {domain, MTO}, {class, in}, {ttl, TTL}, {data, Node}])
+   MTO = "_mto._tcp." ++ Domain,
+   Node = atom_to_list(node()), 
+   LNode =Node  ++ "." ++ MTO,
+   [inet_dns:make_rr([{type, ptr}, 
+                     {domain, SSD}, 
+                     {class, in}, 
+                     {ttl, TTL}, 
+                     {data, MTO}]),
+    inet_dns:make_rr([{type, ptr}, 
+                     {domain, MTO}, 
+                     {class, in}, 
+                     {ttl, TTL}, 
+                     {data, LNode}]),
+    inet_dns:make_rr([{domain, LNode},
+                     {type, srv},
+                     {class, in},
+                     {ttl, TTL},
+                     {data, {0, 0, Port, Node}}])
+
    ].
 
-resources(advertise,Domain, State) ->
-   [].
+resources(advertise, Domain, #state{ttl = TTL, mto_port=Port} = State) ->
+  [].
 
 %%-----------------------------------------------------------------------
 %% Eunit testing code.
