@@ -284,12 +284,16 @@ answers(advertise, Domain, #state{ttl = TTL, mto_port=Port} = State) ->
    LNode = Node ++ "." ++ MTO, 
    [
     inet_dns:make_rr([{type, ptr}, {domain, SSD}, {class, in}, {ttl, TTL}, {data, MTO}]),
-    inet_dns:make_rr([{type, ptr}, {domain, MTO}, {class, in}, {ttl, TTL}, {data, LNode}]),
-    inet_dns:make_rr([{type, srv}, {domain, LNode}, {class, in}, {ttl, TTL}, {data, {0, 0, Port, Node}}])
+    inet_dns:make_rr([{type, ptr}, {domain, MTO}, {class, in}, {ttl, TTL}, {data, LNode}])
    ].
 
 resources(advertise, Domain, #state{ttl = TTL, mto_port=Port} = State) ->
-  [].
+   MTO = "_mtonode._tcp." ++ Domain,
+   Node = atom_to_list(node()),
+   LNode = Node ++ "." ++ MTO, 
+   [
+    inet_dns:make_rr([{type, srv}, {domain, LNode}, {class, in}, {ttl, TTL}, {data, {0, 0, Port, Node}}])
+   ]. 
 
 %%-----------------------------------------------------------------------
 %% Eunit testing code.
