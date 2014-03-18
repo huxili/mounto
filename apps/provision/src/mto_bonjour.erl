@@ -42,6 +42,7 @@
               services=[],
               answers=[],
               ping=0,
+              trace=false,
               db}).
 
 % Internal:  protocol
@@ -93,116 +94,25 @@ dump(Filename) ->
 
 responses() ->
     ets:tab2list(?RESPONSE_DB).
-%%
-% Ex: responses(hostent) =>
-%      [{ok,{hostent,"PCLI",[],inet,4,[{192,168,5,10}]}},
-%      {ok,{hostent,"MACLI",[],inet,4,[{192,168,5,16}]}}]
-%%
+
 responses(hostent) ->
     MS = ets:fun2ms(fun(#response{hostent=H} = R) -> H end),
     L = ets:select(?RESPONSE_DB, MS),
     sets:to_list(sets:from_list(L));
-%%
-% Ex:  responses(host) => ["PCLI","MACLI"]
-%%
+
 responses(host) ->
     MS = ets:fun2ms(fun(#response{hostent={_,{_1,H,_3,_4,_5,_6}}} = R) -> H end),
     L = ets:select(?RESPONSE_DB, MS),
     sets:to_list(sets:from_list(L));
-%% Ex: responses(addr) => [{192,168,5,75},{192,168,5,24}]
+
 responses(addr) ->
     MS = ets:fun2ms(fun(#response{addr=A} = R) -> A end),
     L = ets:select(?RESPONSE_DB, MS),
     sets:to_list(sets:from_list(L));
-%% reponses({10,100,5,75}) =>
+
 responses(Addr) ->
     MS = ets:fun2ms(fun(#response{addr=A} = R) when A == Addr -> R end),
     ets:select(?RESPONSE_DB, MS).
-
-
-%% ------------------------------------------------------------------
-%% gen_server (call back)
-%% ------------------------------------------------------------------
-init([]) ->
-  process_flag(trap_exit, true),
-  Opts = [{reuseaddr,true}, {broadcast, true}, {active, true},
-          { multicast_loop, true}, { multicast_ttl, 255},
-          {add_membership, {{224,0,0,251}, {0,0,0,0}}},
-          binary
-          ],
-  S = case gen_udp:open(?LOCAL_PORT, Opts) of
-         {ok, Socket} -> Socket;
-         _ -> {ok, Socket} = gen_udp:open(0, Opts), Socket
-      end,
-  Db = init_db(),
-  erlang:send_after(500, self(), #mto{cmd=search, args=[?DOMAIN_LOCAL]}),
-  erlang:send_after(1000, self(), #mto{cmd=advertise, args=[?DOMAIN_LOCAL]}),
-  mto_trace:trace(?SERVER, init, "ok"),
-  {ok, #state{socket = S, ping=0, db=Db}}.
-
-%% Cmd: Stop
-handle_call(#mto{cmd=stop}, _From, State) ->
-    mto_trace:trace(?SERVER, stop, "ok"),
-    {stop, normal, {ok,stop}, State};
-
-%% Cmd: Ping
-handle_call(#mto{cmd=ping}, From, State) ->
-    NPing = State#state.ping +1,
-    mto_trace:trace(?SERVER, ping, "from ~p [~p]", [From, NPing]),
-    NewState = State#state{ping=NPing},
-    {reply, {ok, pong}, NewState};
-
-handle_call(_Request, _From, State) ->
-    {reply, ok, State}.
-
-%% Cmd: Search
-handle_cast(#mto{cmd=search, args=[Domain]}, State) ->
-    mto_trace:trace(?SERVER, search, Domain),
-    handle_cast_search(Domain,State),
-    erlang:send_after(crypto:rand_uniform(60000, 600000), self(),
-                      #mto{cmd=search, args=[Domain]}),
-    {noreply, State};
-
-%% Cmd: Advertise
-handle_cast(#mto{cmd=advertise, args=[Domain]}, State) ->
-    mto_trace:trace(?SERVER, advertise, Domain),
-    handle_cast_advertise(Domain,State),
-    erlang:send_after(crypto:rand_uniform(60000, 600000), self(), 
-                     #mto{cmd=advertise, args=[Domain]}),
-    {noreply, State};
-
-%% Cmd: Dump_response
-handle_cast(#mto{cmd=dump_response, args=[Filename]}, State) ->
-    mto_trace:trace(?SERVER, dump_response, Filename),
-    ets:tab2file(?RESPONSE_DB, Filename),
-    {noreply, State};
-
-handle_cast(_Msg, State) ->
-    {noreply, State}.
-
-handle_info(#mto{cmd=search, args=[_Domain]}=Cmd, State) ->
-    handle_cast(Cmd, State),
-    {noreply, State};
-
-handle_info(#mto{cmd=advertise, args=[_Domain]}=Cmd, State) ->
-    handle_cast(Cmd, State),
-    {noreply, State};
-
-handle_info({udp, _S, FromIp, FromPort, Msg}, State) ->
-    handle_info_response({udp, FromIp, FromPort, Msg}, State),
-    {noreply, State};
-
-handle_info(_Info, State) ->
-    {noreply, State}.
-
-terminate(Reason, State) ->
-    mto_trace:trace(?SERVER, terminate, Reason),
-    inet:close(State#state.socket),
-    ok.
-
-code_change(_OldVsn, State, _Extra) ->
-    {ok, State}.
-
 
 %% ------------------------------------------------------------------
 %% API Impl (L1)
@@ -225,6 +135,93 @@ dump_reponse_impl(Filename) ->
       _ -> gen_server:cast(?SERVER, #mto{cmd=dump_response, args=[Filename]})
    end.
 
+
+%% ------------------------------------------------------------------
+%% gen_server (call back)
+%% ------------------------------------------------------------------
+init([]) ->
+  process_flag(trap_exit, true),
+  Opts = [{reuseaddr,true}, {broadcast, true}, {active, true},
+          {multicast_loop, false}, { multicast_ttl, 255},
+          {add_membership, {?MDNS_ADDR, {0,0,0,0}}},
+          binary
+          ],
+  S = case gen_udp:open(?LOCAL_PORT, Opts) of
+         {ok, Socket} -> Socket;
+         _ -> {ok, Socket} = gen_udp:open(0, Opts), Socket
+      end,
+  Db = init_db(),
+  Traced = mto_trace:traced(?MODULE),
+  erlang:send_after(500, self(), #mto{cmd=search, args=[?DOMAIN_LOCAL]}),
+  erlang:send_after(1000, self(), #mto{cmd=advertise, args=[?DOMAIN_LOCAL]}),
+  mto_trace:trace(Traced, ?SERVER, init, "ok"),
+  {ok, #state{socket = S, ping=0, trace=Traced, db=Db}}.
+
+%% Cmd: Stop
+handle_call(#mto{cmd=stop}, _From, State) ->
+    mto_trace:trace(State#state.trace, ?SERVER, stop, "ok"),
+    {stop, normal, {ok,stop}, State};
+
+%% Cmd: Ping
+handle_call(#mto{cmd=ping}, From, State) ->
+    NPing = State#state.ping +1,
+    mto_trace:trace(State#state.trace, ?SERVER, ping, "from ~p [~p]", [From, NPing]),
+    NewState = State#state{ping=NPing},
+    {reply, {ok, pong}, NewState};
+
+handle_call(_Request, _From, State) ->
+    {reply, ok, State}.
+
+%% Cmd: Search
+handle_cast(#mto{cmd=search, args=[Domain]}, State) ->
+    mto_trace:trace(State#state.trace, ?SERVER, search, Domain),
+    handle_cast_search(Domain,State),
+    erlang:send_after(crypto:rand_uniform(60000, 600000), self(),
+                      #mto{cmd=search, args=[Domain]}),
+    {noreply, State};
+
+%% Cmd: Advertise
+handle_cast(#mto{cmd=advertise, args=[Domain]}, State) ->
+    mto_trace:trace(State#state.trace, ?SERVER, advertise, Domain),
+    handle_cast_advertise(Domain,State),
+    erlang:send_after(crypto:rand_uniform(60000, 600000), self(),
+                     #mto{cmd=advertise, args=[Domain]}),
+    {noreply, State};
+
+%% Cmd: Dump_response
+handle_cast(#mto{cmd=dump_response, args=[Filename]}, State) ->
+    mto_trace:trace(State#state.trace, ?SERVER, dump_response, Filename),
+    ets:tab2file(?RESPONSE_DB, Filename),
+    {noreply, State};
+
+handle_cast(_Msg, State) ->
+    {noreply, State}.
+
+handle_info(#mto{cmd=search, args=[_Domain]}=Cmd, State) ->
+    handle_cast(Cmd, State),
+    {noreply, State};
+
+handle_info(#mto{cmd=advertise, args=[_Domain]}=Cmd, State) ->
+    handle_cast(Cmd, State),
+    {noreply, State};
+% Inbound Msg
+handle_info({udp, _S, FromIp, FromPort, Msg}, State) ->
+    handle_info_response({udp, FromIp, FromPort, Msg}, State),
+    {noreply, State};
+
+handle_info(_Info, State) ->
+    {noreply, State}.
+
+terminate(Reason, State) ->
+    mto_trace:trace(State#state.trace, ?SERVER, terminate, Reason),
+    inet:close(State#state.socket),
+    ok.
+
+code_change(_OldVsn, State, _Extra) ->
+    {ok, State}.
+
+
+
 %% --------------------------------------
 %% Callback Impl (L1)
 %% -------------------------------------
@@ -239,9 +236,12 @@ handle_cast_search(Domain,State) ->
    State.
 
 handle_cast_advertise(Domain,State) ->
-   Message = message(advertise, Domain, State),
-   gen_udp:send(State#state.socket, ?MDNS_ADDR, ?MDNS_PORT, inet_dns:encode(Message)),
-   gen_udp:send(State#state.socket, ?MDNS_ADDRv6, ?MDNS_PORT, inet_dns:encode(Message)),
+   M = message(advertise, node, Domain, State),
+   gen_udp:send(State#state.socket, ?MDNS_ADDR, ?MDNS_PORT, inet_dns:encode(M)),
+   gen_udp:send(State#state.socket, ?MDNS_ADDRv6, ?MDNS_PORT, inet_dns:encode(M)),
+   M1 = message(advertise, service, Domain, State),
+   gen_udp:send(State#state.socket, ?MDNS_ADDR, ?MDNS_PORT, inet_dns:encode(M1)),
+   gen_udp:send(State#state.socket, ?MDNS_ADDRv6, ?MDNS_PORT, inet_dns:encode(M1)),
    State.
 
 handle_info_response({udp, FromIp, FromPort, Msg}, State) ->
@@ -249,6 +249,7 @@ handle_info_response({udp, FromIp, FromPort, Msg}, State) ->
    Msg1 = inet_dns:decode(Msg),
    mto_discovery:register_pnode({bonjour, FromIp, FromPort, Msg1}),
    ets:insert(?RESPONSE_DB, #response{addr=FromIp, hostent=Host, port=FromPort, response=Msg1}),
+   do_reply_query({udp, FromIp, FromPort, Msg1}, State),
    State.
 
 
@@ -259,12 +260,18 @@ message(search, Domain, _State) ->
    SSD = ?SSD_DOMAIN_PREFIX ++ Domain,
    Queries = [#dns_query{type=ptr, domain=SSD, class=in},
               #dns_query{type=srv, domain=SSD, class=in}],
-   Msg = #dns_rec{header=#dns_header{}, qdlist=Queries}, Msg;
+   Msg = #dns_rec{header=#dns_header{}, qdlist=Queries}, Msg.
 
-message(advertise, Domain, State) ->
+message(advertise,node, Domain, State) ->
    inet_dns:make_msg([{header, header(advertise)},
-                      {anlist, answers(advertise,Domain, State)},
+                      {anlist, answers(advertise,node,Domain, State)},
+                      {arlist, resources(advertise,Domain, State)}]);
+message(advertise,service, Domain, State) ->
+   inet_dns:make_msg([{header, header(advertise)},
+                      {anlist, answers(advertise,service,Domain, State)},
                       {arlist, resources(advertise,Domain, State)}]).
+
+
 
 header(advertise) ->
    inet_dns:make_header([{id,0},
@@ -277,23 +284,34 @@ header(advertise) ->
                          {pr,false},
                          {rcode,0}]).
 
-answers(advertise, Domain, #state{ttl = TTL, mto_port=Port} = State) ->
+answers(advertise, node, Domain, #state{ttl = TTL, mto_port=Port} = State) ->
    SSD = ?SSD_DOMAIN_PREFIX ++ Domain,
    MTO = "_mtonode._tcp." ++ Domain,
    Node = atom_to_list(node()),
-   LNode = Node ++ "." ++ MTO, 
+   LNode = Node ++ "." ++ MTO,
    [
     inet_dns:make_rr([{type, ptr}, {domain, SSD}, {class, in}, {ttl, TTL}, {data, MTO}]),
     inet_dns:make_rr([{type, ptr}, {domain, MTO}, {class, in}, {ttl, TTL}, {data, LNode}])
+   ];
+
+answers(advertise, service, Domain, #state{ttl = TTL, mto_port=Port} = State) ->
+   MTO = "_mtonode._tcp." ++ Domain,
+   Node = atom_to_list(node()),
+   LNode = Node ++ "." ++ MTO,
+   [
+    inet_dns:make_rr([{type, ptr}, {domain, MTO}, {class, in}, {ttl, TTL}, {data, LNode}]),
+    inet_dns:make_rr([{type, srv}, {domain, LNode}, {class, in}, {ttl, TTL}, {data, {0, 0, Port, Node}}])
    ].
 
 resources(advertise, Domain, #state{ttl = TTL, mto_port=Port} = State) ->
-   MTO = "_mtonode._tcp." ++ Domain,
-   Node = atom_to_list(node()),
-   LNode = Node ++ "." ++ MTO, 
-   [
-    inet_dns:make_rr([{type, srv}, {domain, LNode}, {class, in}, {ttl, TTL}, {data, {0, 0, Port, Node}}])
-   ]. 
+   [].
+
+ do_reply_query({udp, FromIp, FromPort, Msg}, State) ->
+   S = inet:sockname(State#state.socket),
+   mto_trace:trace(State#state.trace, ?SERVER, reply, S),
+   mto_trace:trace(State#state.trace, ?SERVER, reply, "~p ~p ~n", [FromIp, FromPort]),
+   mto_trace:trace(State#state.trace, ?SERVER, reply, Msg),
+   ok.
 
 %%-----------------------------------------------------------------------
 %% Eunit testing code.

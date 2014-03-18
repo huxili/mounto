@@ -9,35 +9,40 @@
 
 
 -module(mto_trace).
--vsn("1.0.0").
+-vsn("1.1.0").
 
--export([trace/3, trace/4]).
+-export([traced/1, trace/4, trace/5]).
 
 %% ------------
 %% API
 %% ------------
-
--spec trace(M::atom(), F::atom(), Args::any()) -> {ignore, trace_inactive}|{ignore, msg_empty}|{ok, logged}.
-
-trace(M, F, Args) when is_atom(M) ->
-    A = application:get_application(),
-    E = application:get_env(list_to_atom(atom_to_list(M) ++ "_trace")),  % ex: {mto_upnp_trace, true}
-    case {A, E} of
-       {undefined, _} -> trace_impl(M, F, Args);  % turn on : isolated module
-       {_App, undefined} -> {ignore, trace_inactive};      % turn off : no flag
-       {_App, {ok,false}} -> {ignore, trace_inactive};     % turn off : flag/false
-       {_App, {ok,_}} -> trace_impl(M, F, Args)   % turn on otherwise
+traced(M) ->
+   A = application:get_application(),
+   E = application:get_env({M, trace}), % ex: {{mto_upnp, trace}, true}},
+   case {A, E} of
+       {undefined, _} -> true;       % turn on : isolated module
+       {_App, undefined} -> false;   % turn off : no flag
+       {_App, {ok,true}} -> true;    % turn on
+       {_App, {ok,_}} -> false       % turn off
    end.
 
+trace(true, M, F, Args) when is_atom(M) ->
+    trace_impl(M, F, Args);
+trace(false, M, _F, _Args) when is_atom(M) ->
+    {ignore, trace_inactive};
+trace(_Active, M, _F, _Args) when is_atom(M) ->
+    {ignore, trace_inactive}.
 
-trace(M, F, MsgFormat, Msg) when is_atom(M) ->
+trace(true, M, F, MsgFormat, Msg) when is_atom(M) ->
     try io_lib:format(MsgFormat, Msg) of
-        Msg1 -> trace(M, F, Msg1)
+         Msg1 -> trace(true, M, F, Msg1)
     catch _:_
-        -> trace(M, F, Msg)
-    end.
-
-
+         -> trace(true, M, F, Msg)
+    end;
+trace(false, M, _F, _MsgFormat, _Msg) when is_atom(M) ->
+    {ignore, trace_inactive};
+trace(_Active, M, _F, _MsgFormat, _Msg) when is_atom(M) ->
+    {ignore, trace_inactive}.
 
 
 %% ---------------------------------------
@@ -62,24 +67,27 @@ trace_impl(Domain, F, Args) ->
 %%-----------------------------------------------------------------------
 -ifdef(EUNIT).
 -include_lib("eunit/include/eunit.hrl").
--define(PERF_REPEAT, 1000).
+-define(PERF_REPEAT, 10000).
+
+traced_test() ->
+    ?assert(traced(mto_trace)).
 
 trace_test() ->
-     trace(?MODULE,trace_test, ["annd", " A simple Msg"]),
-     trace(?MODULE,trace_test, "~s, ~s", ["annd", " A simple Msg"]),
-     trace(?MODULE,trace_test, "~s~f", ["annd", " A simple Msg"]),
-     trace(?MODULE,trace_test, "~s~f", [{"annd", " A simple Msg"}]),
-     trace(?MODULE,trace_test, [{"annd", " A simple Msg"}]),
-     trace(?MODULE,trace_test, "A simple Msg"),
-     ?assert(trace(?MODULE,trace_test, "") == {ignore, msg_empty}),
-     ?assert(trace(?MODULE,trace_test, hello) == {ok, logged}).
+     trace(true, ?MODULE,trace_test, ["annd", " A simple Msg"]),
+     trace(true, ?MODULE,trace_test, "~s, ~s", ["annd", " A simple Msg"]),
+     trace(true, ?MODULE,trace_test, "~s~f", ["annd", " A simple Msg"]),
+     trace(true, ?MODULE,trace_test, "~s~f", [{"annd", " A simple Msg"}]),
+     trace(true, ?MODULE,trace_test, [{"annd", " A simple Msg"}]),
+     trace(true, ?MODULE,trace_test, "A simple Msg"),
+     ?assert(trace(true, ?MODULE,trace_test, "") == {ignore, msg_empty}),
+     ?assert(trace(true, ?MODULE,trace_test, hello) == {ok, logged}).
 
 perf_test() ->
      F = fun(N) ->
          Fun = fun(F1,N1) ->
             case N1 of
                0 -> ok;
-               _ -> trace(?MODULE,perf_test, ""), F1(F1, N1-1)
+               _ -> trace(true, ?MODULE,perf_test, ""), F1(F1, N1-1)
             end
          end,
          Fun(Fun, N)

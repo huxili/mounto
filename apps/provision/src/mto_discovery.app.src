@@ -10,5 +10,5 @@
                   stdlib
                  ]},
   {mod, {mto_discovery_sup, []}},
-  {env, [{mto_discovery_trace, true}]}
+  {env, [{{mto_discovery, trace}, true}]}
  ]}.

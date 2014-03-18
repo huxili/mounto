@@ -31,6 +31,8 @@ restart() ->
 %% ===================================================================
 start(_StartType, _StartArgs) ->
     Name = {local, ?SUPERVISOR},
+    Traced = mto_trace:traced(?MODULE),
+    mto_trace:trace(Traced, ?APPLICATION, start, application:get_all_env()),
     supervisor:start_link(Name, ?MODULE, []).
 
 stop(_State) ->

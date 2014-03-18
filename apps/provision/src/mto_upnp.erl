@@ -35,7 +35,7 @@
 -define(DEFAULT_RESPONSE_FILENAME, 'upnp_responses.ets').
 
 % Internal: Server State
--record(state, {socket, ping=0, db}).
+-record(state, {socket, ping=0, trace=false, db}).
 
 % Internal:  protocol
 -record(mto, {cat=upnp, cmd, args=[]}).
@@ -121,26 +121,30 @@ responses(Addr) ->
 init([]) ->
   process_flag(trap_exit, true),
   Opts = [{reuseaddr,true}, {broadcast, true}, {active, true}],
-  {ok, S} = gen_udp:open(?LOCAL_PORT, Opts),
+  S = case gen_udp:open(?LOCAL_PORT, Opts) of
+         {ok, Socket} -> Socket;
+         _ -> {ok, Socket} = gen_udp:open(0, Opts), Socket
+  end,
   Db = init_db(),
-  mto_trace:trace(?SERVER, init, "ok"),
-  {ok, #state{socket = S, ping=0, db=Db}, 5000}.
+  Traced = mto_trace:traced(?MODULE),
+  mto_trace:trace(Traced, ?SERVER, init, "ok"),
+  {ok, #state{socket = S, ping=0, trace=Traced, db=Db}, 5000}.
 
 %% Cmd: Stop
 handle_call(#mto{cmd=stop}, _From, State) ->
-     mto_trace:trace(?SERVER, stop, "ok"),
+     mto_trace:trace(State#state.trace, ?SERVER, stop, "ok"),
     {stop, normal, {ok,stop}, State};
 
 %% Cmd: Ping
 handle_call(#mto{cmd=ping}, From, State) ->
     NPing = State#state.ping +1,
-    mto_trace:trace(?SERVER, ping, "from ~p [~p]", [From, NPing]),
+    mto_trace:trace(State#state.trace, ?SERVER, ping, "from ~p [~p]", [From, NPing]),
     NewState = State#state{ping=NPing},
     {reply, {ok, pong}, NewState};
 
 %% Cmd: Dump_response
 handle_call(#mto{cmd=dump_response, args=[Filename]}, _From, State) ->
-    R = dump_response_db(Filename),
+    R = dump_response_db(Filename, State),
     {reply, R, State};
 
 handle_call(Request, _From, State) ->
@@ -154,11 +158,11 @@ handle_cast(#mto{cmd=search, args=[SearchMsg]}, State) ->
 
 %% Cmd: Dump_response
 handle_cast(#mto{cmd=dump_response, args=[Filename]}, State) ->
-    dump_response_db(Filename),
+    dump_response_db(Filename, State),
     {noreply, State};
 
 handle_cast(_Msg, State) ->
-    mto_trace:trace(?SERVER, cast, _Msg),
+    mto_trace:trace(State#state.trace, ?SERVER, cast, _Msg),
     {noreply, State}.
 
 handle_info({udp, _S, FromIp, FromPort, Msg}, State) ->
@@ -169,12 +173,12 @@ handle_info(timeout, State) ->
     handle_cast_search(?UPNP_SEARCH_ALL,State),
     {noreply, State};
 handle_info(_Info, State) ->
-    mto_trace:trace(?SERVER, info, _Info),
+    mto_trace:trace(State#state.trace, ?SERVER, info, _Info),
     {noreply, State}.
 
 terminate(Reason, State) ->
     inet:close(State#state.socket),
-    mto_trace:trace(?SERVER, terminate, Reason),
+    mto_trace:trace(State#state.trace, ?SERVER, terminate, Reason),
     ok.
 
 code_change(_OldVsn, State, _Extra) ->
@@ -204,7 +208,7 @@ init_db() ->
    ets:new(?RESPONSE_DB, [set, {keypos,#response.addr}, named_table]).
 
 handle_cast_search(SearchMsg,State) ->
-   mto_trace:trace(?SERVER, search, "cast ~p", [SearchMsg]),
+   mto_trace:trace(State#state.trace, ?SERVER, search, "cast ~p", [SearchMsg]),
    search_impl(SearchMsg, State),
    State.
 
@@ -219,9 +223,9 @@ search_impl(SearchMsg, State) ->
    gen_udp:send(State#state.socket, ?UPNP_ADDRv6, ?UPNP_PORT, SearchMsg),
    State.
 
-dump_response_db(Filename)->
+dump_response_db(Filename, State)->
    R = ets:tab2file(?RESPONSE_DB, Filename),
-   mto_trace:trace(?SERVER, dump_response, R),
+   mto_trace:trace(State#state.trace, ?SERVER, dump_response, R),
    R.
 
 

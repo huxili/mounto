@@ -18,7 +18,7 @@
 -define(DISCOVERED_PNODE_DB, mto_pnode_db).
 
 % Internal: State
--record(state, {pnode_db, args}).
+-record(state, {pnode_db, trace=false, args}).
 
 % Internal:  protocol
 -record(mto, {cat=discovery, cmd, args=[]}).
@@ -99,7 +99,8 @@ enode() ->
 init(Args) ->
   process_flag(trap_exit, true),
   Db = init_db(),
-  {ok, #state{pnode_db=Db, args = Args}}.
+  Traced = mto_trace:traced(?MODULE),
+  {ok, #state{pnode_db=Db,trace=Traced, args = Args}}.
 
 handle_event(Event, State) ->
     handle_any_event(Event, State).
@@ -128,7 +129,6 @@ code_change(_OldVsn, State, _Extra) ->
 %% -------------------------------------
 init_db() ->
    Tab = ets:new(?DISCOVERED_PNODE_DB, [set, {keypos,#pnode.addr}, named_table]),
-   mto_trace:trace(?MODULE, init_db, ok),
    Tab.
 
 handle_any_event({upnp, FromIp, FromPort, RawMsg}, State) ->
