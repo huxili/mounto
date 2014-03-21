@@ -1,0 +1,352 @@
+﻿<head>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="http://code.jquery.com/mobile/1.4.2/jquery.mobile-1.4.2.min.css">
+<script src="http://code.jquery.com/jquery-1.10.2.min.js"></script>
+<script src="http://code.jquery.com/mobile/1.4.2/jquery.mobile-1.4.2.min.js"></script>
+</head> 
+
+<body>
+	
+
+<div data-role="page" id="home">
+  <div data-role="header" data-position="fixed">
+    <a href="#home" class="ui-btn ui-corner-all ui-shadow ui-icon-home ui-btn-icon-left">Home</a>
+    <h1>Test</h1>
+    <a href="#table" class="ui-btn ui-corner-all ui-shadow ui-icon-search ui-btn-icon-left">Table</a>
+    <a href="#list" class="ui-btn ui-corner-all ui-shadow ui-icon-search ui-btn-icon-left">List</a>
+    <a href="#list1" class="ui-btn ui-corner-all ui-shadow ui-icon-search ui-btn-icon-left">List 1</a>
+  </div>
+
+  <div data-role="main" class="ui-content">
+    <p>Welcome! If you click on the link below, it will take you to Page Two.</p>
+    <a href="#toolbar">Toolbar</a>
+    <a href="#page2">Go to Page Two</a>
+    <a href="http://www.google.com">Google</a>
+    <a href="#dialog" data-transition="pop" class="ui-btn">Go to Page 3</a>
+    
+    <div data-role="collapsible">
+      <h1>Click me - I'm collapsible!</h1>
+      <p>I'm the expanded content.</p>
+      <div data-role="collapsible">
+        <h1>Click me - I'm a nested collapsible block!</h1>
+        <p>I'm the expanded content in the nested collapsible block.</p>
+      </div>
+    </div>
+        
+    <div data-role="collapsibleset">
+      <div data-role="collapsible">
+       <h1>Click me - I'm collapsible!</h1>
+       <p>I'm the expanded content.</p>
+      </div>
+      <div data-role="collapsible">
+       <h1>Click me - I'm collapsible!</h1>
+       <p>I'm the expanded content.</p>
+      </div>
+    </div>
+        
+  </div>
+
+  <div data-role="footer" style="text-align:center;" data-position="fixed"  data-theme="b">
+  	<a href="#" class="ui-btn ui-icon-plus ui-btn-icon-left">Add Me On Facebook</a>
+    <a href="#" class="ui-btn ui-icon-plus ui-btn-icon-left">Add Me On Twitter</a>
+    <a href="#" class="ui-btn ui-icon-plus ui-btn-icon-left">Add Me On Instagram</a>
+    <div data-role="navbar">
+      <ul>
+        <li><a href="#" data-icon="home">Home</a></li>
+        <li><a href="#" data-icon="arrow-r">Page Two</a></li>
+        <li><a href="#" data-icon="search">Search</a></li>
+      </ul>
+    </div>
+  </div>
+  
+</div> 
+
+<div data-role="page" id="page2">
+  <div data-role="header">
+    <h1>Welcome To Page2</h1>
+  </div>
+
+  <div data-role="main" class="ui-content">
+    <p>This is Page Two. If you click on the link below, it will take you to Page One.</p>
+    <a href="#home" class="ui-btn ui-btn-inline ui-icon-home ui-btn-icon-left">Go to Page One</a>
+    <a href="#home" class="ui-btn ui-btn-inline ui-icon-home ui-btn-icon-notext">Go to Page One</a>
+    
+    <div data-role="controlgroup" data-type="vertical">
+    	<p>Group1 </p>
+      <a href="#home" class="ui-btn">Home</a>
+      <a href="http://www.google.com" class="ui-btn">Google</a>
+      <a href="#dialog" data-transition="pop" class="ui-btn">Go to Page 3</a>
+    </div>
+
+    <div data-role="controlgroup" data-type="vertical">
+    	<p>Group 2 </p>
+      <a href="#home" class="ui-btn ui-btn-inline">Home</a>
+      <a href="http://www.google.com" class="ui-btn ui-btn-inline">Google</a>
+      <a href="#dialog" data-transition="pop" class="ui-btn ui-btn-inline">Go to Page 3</a>
+    </div>
+    
+  </div>
+
+  <div data-role="footer">
+    <h1>Page2</h1>
+  </div>
+</div> 
+
+
+<div data-role="page" data-dialog="true" id="dialog">
+  <div data-role="header">
+    <h1>I'm A Dialog Box!</h1>
+  </div>
+
+  <div data-role="main" class="ui-content">
+    <p>The dialog box is different from a normal page, it is displayed on top of the current page and it will not span the entire width of the page. The dialog has also an icon of "X" in the header to close the box.</p>
+    <a href="#home">Go to Page One</a>
+  </div>
+  
+</div> 
+
+
+<div data-role="page" id="toolbar">
+  <div data-role="header" data-position="fixed">
+    <a href="#home" class="ui-btn ui-corner-all ui-shadow ui-icon-home ui-btn-icon-left">Home</a>
+    <h1>Welcome To My Homepage</h1>
+    <a href="#home" class="ui-btn ui-corner-all ui-shadow ui-icon-search ui-btn-icon-left">Search</a>
+  </div>
+
+   <div data-role="main" class="ui-content">
+    <p>Notice that we have added the CSS class of "ui-corner-all" and "ui-shadow" to the header buttons, to make them look a bit more desirable.</p>
+    <p>Some text to enable scrolling..Some text to enable scrolling..Some text to enable scrolling..Some text to enable scrolling..Some text to enable scrolling..Some text to enable scrolling..Some text to enable scrolling..Some text to enable scrolling..Some text to enable scrolling..Some text to enable scrolling..Some text to enable scrolling..Some text to enable scrolling..Some text to enable scrolling..Some text to enable scrolling..Some text to enable scrolling..Some text to enable scrolling..Some text to enable scrolling..Some text to enable scrolling..Some text to enable scrolling..Some text to enable scrolling..Some text to enable scrolling..Some text to enable scrolling..Some text to enable scrolling..Some text to enable scrolling..Some text to enable scrolling..Some text to enable scrolling..Some text to enable scrolling..Some text to enable scrolling..Some text to enable scrolling..Some text to enable scrolling..Some text to enable scrolling..Some text to enable scrolling..Some text to enable scrolling..Some text to enable scrolling..Some text to enable scrolling..Some text to enable scrolling..Some text to enable scrolling..Some text to enable scrolling..Some text to enable scrolling..Some text to enable scrolling..Some text to enable scrolling..Some text to enable scrolling..Some text to enable scrolling..Some text to enable scrolling..Some text to enable scrolling..Some text to enable scrolling..Some text to enable scrolling..Some text to enable scrolling..Some text to enable scrolling..Some text to enable scrolling..Some text to enable scrolling..Some text to enable scrolling..Some text to enable scrolling..Some text to enable scrolling..Some text to enable scrolling..Some text to enable scrolling..Some text to enable scrolling..Some text to enable scrolling..Some text to enable scrolling..Some text to enable scrolling..Some text to enable scrolling..Some text to enable scrolling..Some text to enable scrolling..Some text to enable scrolling..Some text to enable scrolling..Some text to enable scrolling..Some text to enable scrolling..Some text to enable scrolling..Some text to enable scrolling..Some text to enable scrolling..Some text to enable scrolling..</p>
+    
+  </div>
+</div>	
+
+
+<div data-role="page" id="table">
+  <div data-role="header">
+    <h1>Reflow Table</h1>
+  </div>
+  
+  <div data-role="main" class="ui-content">
+
+    <p>The "column toggle table" will hide columns when there is not enough width to display the data.</p>
+    <p>In this example we have used the well-known Northwind sample database. Below is a selection from the "Customers" table.</p>
+    <h4>Slowly resize the width of your browser window. The layout will adjust itself to fit the "new" width of the browser. OR, you can use the "Columns..." button to choose which column should be hidden or shown.</h4>
+    
+    <table data-role="table" data-mode="columntoggle" class="ui-responsive ui-shadow" id="myTable">
+      <thead>
+        <tr>
+          <th data-priority="6">CustomerID</th>
+          <th>CustomerName</th>
+          <th data-priority="1">ContactName</th>
+          <th data-priority="2">Address</th>
+          <th data-priority="3">City</th>
+          <th data-priority="4">PostalCode</th>
+          <th data-priority="5">Country</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>1</td>
+          <td>Alfreds Futterkiste</td>
+          <td>Maria Anders</td>
+          <td>Obere Str. 57</td>
+          <td>Berlin</td>
+          <td>12209</td>
+          <td>Germany</td>
+        </tr>
+        <tr>
+          <td>2</td>
+          <td>Antonio Moreno Taquería</td>
+          <td>Antonio Moreno</td>
+          <td>Mataderos 2312</td>
+          <td>México D.F.</td>
+          <td>05023</td>
+          <td>Mexico</td>
+        </tr>
+        <tr>
+          <td>3</td>
+          <td>Around the Horn</td>
+          <td>Thomas Hardy</td>
+          <td>120 Hanover Sq.</td>
+          <td>London</td>
+          <td>WA1 1DP</td>
+          <td>UK</td>
+        </tr>
+        <tr>
+          <td>4</td>
+          <td>Berglunds snabbköp</td>
+          <td>Christina Berglund</td>
+          <td>Berguvsvägen 8</td>
+          <td>Luleå</td>
+          <td>S-958 22</td>
+          <td>Sweden</td>
+        </tr>
+
+      </tbody>
+    </table>
+       
+  </div>
+
+  <div data-role="footer">
+    <h1>Footer Text</h1>
+  </div>
+</div> 
+
+
+<div data-role="page" id="list">
+  <div data-role="main" class="ui-content">
+  	
+    <h2>List Dividers</h2>
+    <ul data-role="listview" data-inset="true">
+      <li data-role="list-divider">Europe</li>
+      <li><a href="#">Norway</a></li>
+      <li><a href="#">Germany</a></li>
+      <li data-role="list-divider">Asia</li>
+      <li><a href="#">India</a></li>
+      <li><a href="#">Thailand</a></li>
+      <li data-role="list-divider">Africa</li>
+      <li><a href="#">Zimbabwe</a></li>
+      <li><a href="#">Uganda</a></li>
+    </ul>
+  
+		<ul data-role="listview"> 
+		  <li><a href="#">Default is right arrow</a></li>
+		  <li data-icon="plus"><a href="#">data-icon="plus"</a></li>
+		  <li data-icon="minus"><a href="#">data-icon="minus"</a></li>
+		  <li data-icon="delete"><a href="#">data-icon="delete"</a></li>
+		  <li data-icon="location"><a href="#">data-icon="location"</a></li> 
+		  <li data-icon="false"><a href="#">data-icon="false"</a></li>
+		</ul>
+    
+    <h2>List With Icons:</h2>
+    <ul data-role="listview" data-inset="true">
+      <li><a href="#"><img src="us.png" alt="USA" class="ui-li-icon">USA</a></li>
+      <li><a href="#"><img src="gb.png" alt="Great Britain" class="ui-li-icon">Great Britain</a></li>
+      <li><a href="#"><img src="finland.png" alt="Finland" class="ui-li-icon">Finland</a></li>
+      <li><a href="#"><img src="germany.png" alt="Germany" class="ui-li-icon">Germany</a></li>
+      <li><a href="#"><img src="france.png" alt="France" class="ui-li-icon">France</a></li>
+    </ul>    
+    
+    <h2>List With Thumbnails and Text</h2>
+    <ul data-role="listview" data-inset="true">
+      <li>
+        <a href="#">
+        <img src="chrome.png">
+        <h2>Google Chrome</h2>
+        <p>Google Chrome is a free, open-source web browser. Released in 2008.</p>
+        </a>
+      </li>
+      <li>
+        <a href="#">
+        <img src="firefox.png">
+        <h2>Mozilla Firefox</h2>
+        <p>Firefox is a web browser from Mozilla. Released in 2004.</p>
+        </a>
+      </li>
+    </ul>    
+    
+    <h2>Split Buttons</h2>
+    <ul data-role="listview" data-inset="true">
+      <li>
+        <a href="#">
+        <img src="chrome.png">
+        <h2>Google Chrome</h2>
+        <p>Google Chrome is a free, open-source web browser. Released in 2008.</p>
+        </a>
+        <a href="#">Some Text</a>
+      </li>
+      <li>
+        <a href="#">
+        <img src="firefox.png">
+        <h2>Mozilla Firefox</h2>
+        <p>Firefox is a web browser from Mozilla. Released in 2004.</p>
+        </a>
+        <a href="#">Some Text</a>
+      </li>
+    </ul>    
+    
+    <h2>Click On The Gear Icons!</h2>
+    <ul data-role="listview" data-inset="true">
+      <li data-role="divider">Browsers</li>
+      <li>
+        <a href="#home">
+        <img src="chrome.png">
+        <h2>Google Chrome</h2>
+        <p>Google Chrome is a free, open-source web browser. Released in 2008.</p>
+        </a>
+        <a href="#dialog" data-transition="pop" data-icon="gear">Download Browser</a>
+      </li>
+      <li>
+        <a href="#home">
+        <img src="firefox.png">
+        <h2>Mozilla Firefox</h2>
+        <p>Firefox is a web browser from Mozilla. Released in 2004.</p>
+        </a>
+        <a href="#dialog" data-transition="pop" data-icon="gear">Download Browser</a>
+      </li>
+    </ul>
+    
+    <h2>My Email Account</h2>
+    <ul data-role="listview" data-inset="true">
+      <li><a href="#">Inbox<span class="ui-li-count">25</span></a></li>
+      <li><a href="#">Sent<span class="ui-li-count">432</span></a></li>
+      <li><a href="#">Trash<span class="ui-li-count">7</span></a></li>
+    </ul>
+        
+  </div>
+  
+</div> 
+
+
+<div data-role="page" id="list1">
+  <div data-role="main" class="ui-content">
+  	
+    <h2>My Phonebook</h2>
+    <form class="ui-filterable">
+      <input id="myFilter" data-type="search" placeholder="Search for names..">
+    </form>
+    <ul data-role="listview" data-filter="true" data-input="#myFilter" data-autodividers="true" data-inset="true">
+      <li><a href="#">Adele</a></li>
+      <li><a href="#">Agnes</a></li>
+      <li><a href="#">Albert</a></li>
+      <li><a href="#">Billy</a></li>
+      <li><a href="#">Bob</a></li>
+      <li><a href="#">Calvin</a></li>
+      <li><a href="#">Cameron</a></li>
+      <li><a href="#">Chloe</a></li>
+      <li><a href="#">Christina</a></li>
+      <li><a href="#">Diana</a></li>
+      <li><a href="#">Gabriel</a></li>
+      <li><a href="#">Glen</a></li>
+      <li><a href="#">Ralph</a></li>
+      <li><a href="#">Valarie</a></li>
+    </ul>
+    
+    <h2>My Phonebook 1</h2>
+    <p>In this example, we have used the data-filtertext="fav" on "Adele". This means that you are no longer able to search for the list item "Adele" anymore. You can only find Adele by typing the keywords "f, a, v or fav".)</p>
+    <form class="ui-filterable">
+      <input id="myFilter" data-type="search">
+    </form>
+    <ul data-role="listview" data-filter="true" data-input="#myFilter" data-autodividers="true" data-inset="true">
+      <li data-filtertext="fav"><a href="#">Adele</a></li>
+      <li><a href="#">Agnes</a></li>
+      <li><a href="#">Albert</a></li>
+      <li><a href="#">Billy</a></li>
+      <li><a href="#">Bob</a></li>
+      <li><a href="#">Calvin</a></li>
+      <li><a href="#">Cameron</a></li>
+      <li><a href="#">Chloe</a></li>
+      <li><a href="#">Christina</a></li>
+      <li><a href="#">Diana</a></li>
+      <li><a href="#">Frank</a></li>
+      <li><a href="#">Gabriel</a></li>
+      <li><a href="#">Glen</a></li>
+      <li><a href="#">Ralph</a></li>
+      <li><a href="#">Valarie</a></li>
+    </ul>    
+    
+  </div>
+</div> 
+
+
+</body>

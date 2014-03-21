@@ -1,0 +1,14 @@
+%% -vsn("1.0").
+
+{application, mto_ebus,
+ [
+  {description, "Service bus"},
+  {vsn, "1.0"},
+  {registered, []},
+  {applications, [
+                  kernel,
+                  stdlib
+                 ]},
+  {mod, {mto_ebus_sup, []}},
+  {env, [{{mto_ebus, trace}, true}]}
+ ]}.
